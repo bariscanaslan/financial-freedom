@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------- Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---------------------------------------------------------- sanal ortamlar
+.venv/
+venv/
+env/
+ENV/
+
+# ------------------------------------------------------------------ notebook
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# ============================================================================
+# VERI VE MODEL CIKTILARI
+# ============================================================================
+# Bunlar URETILEBILIR: yfinance'ten yeniden indirilir, model yeniden egitilir.
+# Repoyu sismekten korumak icin disarida tutuluyorlar.
+
+# Indirilmis OHLCV parquet cache'i (data/config.py -> CACHE_DIR)
+cache/
+
+# Egitilmis modeller: model.pt (binary agirliklar) + meta.json
+#
+# NOT -- DENETLENEBILIRLIK: bir modeli URETIME alirsan, o modelin
+# meta.json'ini (scaler, cfg, test metrikleri, git commit) commit etmek
+# ISTEYEBILIRSIN. Binary agirliklar git'e ait degil, ama "uretimde su an
+# hangi model var ve skoru neydi" sorusunun cevabi repoda durmali.
+# O durumda ilgili dosyayi acikca ekle:
+#     git add -f models/AAPL_20260714_120000/meta.json
+#
+# 'models/' degil 'models/*' -- git, ust dizini dislanmis bir dosyayi geri
+# alamaz. Dizini disarida birakirsak asagidaki !models/.gitkeep calismaz.
+models/*
+!models/.gitkeep
+
+# ------------------------------------------------------------------- loglar
+*.log
+logs/
+
+# ---------------------------------------------------------------- arac/editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ------------------------------------------------------------------ pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ---------------------------------------------------------------------- gizli
+# API anahtarlari (ileride: haber/sentiment saglayicisi, borsa verisi)
+.env
+.env.*
+!.env.example
+secrets.json
