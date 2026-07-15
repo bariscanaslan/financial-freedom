@@ -570,6 +570,18 @@ class NotificationSettingsResponse(BaseModel):
     updated_at: str | None = None
 
 
+class NotificationTestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    channel: str = "all"
+
+    @field_validator("channel")
+    @classmethod
+    def _channel(cls, value: str) -> str:
+        if value not in {"all", "email", "telegram"}:
+            raise ValueError("invalid notification channel")
+        return value
+
+
 class PortfolioAlertUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     threshold_pct: float = Field(gt=0, le=100)

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from api.deps import get_db, get_price_provider, require_portfolio
 from api.errors import BadRequest, NotFound
 from api.schemas import (
-    NotificationSettingsResponse, NotificationSettingsUpdate,
+    NotificationSettingsResponse, NotificationSettingsUpdate, NotificationTestRequest,
     PortfolioAlertResponse, PortfolioAlertUpdate,
     WatchlistAlertCreate, WatchlistAlertResponse, WatchlistAlertsResponse,
 )
@@ -24,12 +24,15 @@ def update_settings(body: NotificationSettingsUpdate, db=Depends(get_db)):
 
 
 @router.post("/notification-settings/test")
-def test_notification(request: Request, db=Depends(get_db)):
+def test_notification(body: NotificationTestRequest, request: Request, db=Depends(get_db)):
     settings = db.get_notification_settings()
+    choices = {
+        "email_enabled": body.channel in {"all", "email"} and settings["email_enabled"],
+        "telegram_enabled": body.channel in {"all", "telegram"} and settings["telegram_enabled"],
+    }
     result = request.app.state.notification_service.send(
         "Financial Freedom test bildirimi", "Bildirim ayarlarınız başarıyla çalışıyor.",
-        {"email_enabled": settings["email_enabled"], "telegram_enabled": settings["telegram_enabled"]},
-        kind="test")
+        choices, kind="test")
     return result
 
 
@@ -41,6 +44,18 @@ def get_portfolio_alert(pid: str = Depends(require_portfolio), db=Depends(get_db
 @router.put("/portfolios/{portfolio_id}/alert", response_model=PortfolioAlertResponse)
 def update_portfolio_alert(body: PortfolioAlertUpdate, pid: str = Depends(require_portfolio), db=Depends(get_db)):
     return db.upsert_portfolio_alert(pid, body.model_dump())
+
+
+@router.post("/portfolios/{portfolio_id}/alert/test")
+def test_portfolio_alert(request: Request, pid: str = Depends(require_portfolio), db=Depends(get_db)):
+    alert = db.get_portfolio_alert(pid)
+    if alert is None:
+        raise BadRequest("Önce portföy alarmını kaydedin.")
+    portfolio = db.get_portfolio(pid)
+    return request.app.state.notification_service.send(
+        f"{portfolio['name']} portföy alarmı testi",
+        f"%{alert['threshold_pct']:.2f} hareket eşiği için test bildirimi. Gerçek alarm durumu değiştirilmedi.",
+        alert, kind="portfolio_test")
 
 
 @router.get("/watchlist", response_model=WatchlistAlertsResponse)
@@ -67,6 +82,18 @@ def create_watchlist(body: WatchlistAlertCreate, db=Depends(get_db), prices=Depe
     except Exception:
         pass
     return db.get_watchlist_alert(row["id"])
+
+
+@router.post("/watchlist/{alert_id}/test")
+def test_watchlist_alert(alert_id: str, request: Request, db=Depends(get_db)):
+    alert = db.get_watchlist_alert(alert_id)
+    if alert is None:
+        raise NotFound("watchlist alert not found")
+    direction = "üzerine çıkma" if alert["direction"] == "above" else "altına düşme"
+    return request.app.state.notification_service.send(
+        f"{alert['ticker']} takip alarmı testi",
+        f"${alert['target_price']:.2f} hedefine {direction} bildirimi test edildi. Alarm durumu değiştirilmedi.",
+        alert, kind="watchlist_test")
 
 
 @router.delete("/watchlist/{alert_id}")

@@ -27,9 +27,9 @@ export default function SettingsPage() {
       setMessage("Bildirim ayarları kaydedildi.");
     } catch { setMessage("Ayarlar kaydedilemedi."); } finally { setBusy(false); }
   }
-  async function test() {
+  async function test(channel: "all" | "email" | "telegram") {
     setBusy(true); setMessage("");
-    try { const result = await testNotifications();
+    try { const result = await testNotifications(channel);
       setMessage(result.status === "sent" ? `Test bildirimi gönderildi: ${result.channels.join(", ")}` : `Gönderilemedi: ${result.errors.join(" · ")}`);
     } catch { setMessage("Test bildirimi gönderilemedi."); } finally { setBusy(false); }
   }
@@ -51,7 +51,12 @@ export default function SettingsPage() {
         <label className="field">Bot token<input type="password" value={form.telegram_bot_token} onChange={(e) => set("telegram_bot_token", e.target.value)} placeholder={secretState.telegram ? "Kayıtlı · değiştirmek için yeni değer girin" : "123456:ABC..."} autoComplete="new-password" /></label>
         <label className="field">Chat ID<input value={form.telegram_chat_id} onChange={(e) => set("telegram_chat_id", e.target.value)} placeholder="123456789" /></label>
       </div>
-      <div className="form-row"><button className="btn primary" disabled={busy}>Kaydet</button><button type="button" className="btn" onClick={test} disabled={busy}>Test bildirimi gönder</button></div>
+      <div className="form-row">
+        <button className="btn primary" disabled={busy}>Kaydet</button>
+        <button type="button" className="btn" onClick={() => test("email")} disabled={busy || !form.email_enabled}>E-postayı test et</button>
+        <button type="button" className="btn" onClick={() => test("telegram")} disabled={busy || !form.telegram_enabled}>Telegram&apos;ı test et</button>
+        <button type="button" className="btn" onClick={() => test("all")} disabled={busy || (!form.email_enabled && !form.telegram_enabled)}>Tümünü test et</button>
+      </div>
       {message && <p className="note" role="status">{message}</p>}
     </form>
   </div>;

@@ -97,14 +97,16 @@ class NotificationService:
             try:
                 self._send_email(settings, subject, message)
                 channels.append("email")
-            except Exception as exc:
-                errors.append(f"email: {exc}")
+            except Exception:
+                errors.append("E-posta teslim edilemedi. Resend ayarlarını kontrol edin.")
         if choices.get("telegram_enabled") and settings.get("telegram_enabled"):
             try:
                 self._send_telegram(settings, subject, message)
                 channels.append("telegram")
-            except Exception as exc:
-                errors.append(f"telegram: {exc}")
+            except Exception:
+                errors.append("Telegram teslim edilemedi. Bot token ve Chat ID'yi kontrol edin.")
+        if not channels and not errors:
+            errors.append("Seçili bildirim kanalı etkin değil.")
         status = "sent" if channels and not errors else "partial" if channels else "failed"
         self._db.save_notification_event(kind, subject, message, channels, status)
         return {"status": status, "channels": channels, "errors": errors}

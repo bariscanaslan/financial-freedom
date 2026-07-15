@@ -132,13 +132,16 @@ export const saveNotificationSettings = (body: {
   telegram_bot_token: string; telegram_chat_id: string;
   email_enabled: boolean; telegram_enabled: boolean;
 }) => req<NotificationSettings>("/notification-settings", { method: "PUT", body: JSON.stringify(body) });
-export const testNotifications = () =>
-  req<{ status: string; channels: string[]; errors: string[] }>("/notification-settings/test", { method: "POST" });
+export type NotificationTestResult = { status: string; channels: string[]; errors: string[] };
+export const testNotifications = (channel: "all" | "email" | "telegram") =>
+  req<NotificationTestResult>("/notification-settings/test", { method: "POST", body: JSON.stringify({ channel }) });
 export const getPortfolioAlert = (id: string) =>
   req<PortfolioAlert | null>(`/portfolios/${pid(id)}/alert`);
 export const savePortfolioAlert = (id: string, body: {
   threshold_pct: number; email_enabled: boolean; telegram_enabled: boolean; enabled: boolean;
 }) => req<PortfolioAlert>(`/portfolios/${pid(id)}/alert`, { method: "PUT", body: JSON.stringify(body) });
+export const testPortfolioAlert = (id: string) =>
+  req<NotificationTestResult>(`/portfolios/${pid(id)}/alert/test`, { method: "POST" });
 export const listWatchlist = () => req<{ count: number; alerts: WatchlistAlert[] }>("/watchlist");
 export const getWatchlistQuote = (ticker: string) =>
   req<{ ticker: string; price: number; as_of: string }>(`/watchlist/quote?ticker=${encodeURIComponent(ticker)}`);
@@ -148,6 +151,8 @@ export const createWatchlistAlert = (body: {
 }) => req<WatchlistAlert>("/watchlist", { method: "POST", body: JSON.stringify(body) });
 export const deleteWatchlistAlert = (id: string) =>
   req<{ id: string; deleted: boolean }>(`/watchlist/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const testWatchlistAlert = (id: string) =>
+  req<NotificationTestResult>(`/watchlist/${encodeURIComponent(id)}/test`, { method: "POST" });
 
 const pid = (id: string) => encodeURIComponent(id);
 

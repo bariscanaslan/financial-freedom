@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createWatchlistAlert, deleteWatchlistAlert, getWatchlistQuote, listWatchlist } from "@/lib/api";
+import { createWatchlistAlert, deleteWatchlistAlert, getWatchlistQuote, listWatchlist, testWatchlistAlert } from "@/lib/api";
 import { money } from "@/lib/format";
 import type { WatchlistAlert } from "@/lib/types";
 
@@ -36,6 +36,7 @@ export default function WatchlistPage() {
     } catch { setMessage("Takip alarmı eklenemedi."); }
   }
   async function remove(id: string) { if (!window.confirm("Bu takip alarmını silmek istediğinizden emin misiniz?")) return; await deleteWatchlistAlert(id); await load(); }
+  async function test(id: string) { setMessage(""); try { const result = await testWatchlistAlert(id); setMessage(result.status === "sent" ? `Test gönderildi: ${result.channels.join(", ")}` : result.errors.join(" · ")); } catch { setMessage("Takip alarmı test edilemedi."); } }
 
   return <div>
     <h1>Takip Listesi</h1>
@@ -52,7 +53,7 @@ export default function WatchlistPage() {
       {message && <p className="note" role="status">{message}</p>}
     </form>
     <div className="table-scroll"><table className="data-table"><thead><tr><th className="left">Sembol</th><th>Koşul</th><th>Hedef</th><th>Son fiyat</th><th>Kanallar</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>
-      {alerts.map((alert) => <tr key={alert.id}><td className="left"><strong>{alert.ticker}</strong></td><td>{alert.direction === "above" ? "Üzerine çıkarsa" : "Altına düşerse"}</td><td>{money(alert.target_price)}</td><td>{money(alert.last_price)}</td><td>{[alert.email_enabled && "E-posta", alert.telegram_enabled && "Telegram"].filter(Boolean).join(" · ") || "—"}</td><td><span className={`chip ${alert.active ? "accent" : ""}`}>{alert.active ? "İzleniyor" : "Tetiklendi"}</span></td><td><button className="btn danger sm" onClick={() => remove(alert.id)}>Sil</button></td></tr>)}
+      {alerts.map((alert) => <tr key={alert.id}><td className="left"><strong>{alert.ticker}</strong></td><td>{alert.direction === "above" ? "Üzerine çıkarsa" : "Altına düşerse"}</td><td>{money(alert.target_price)}</td><td>{money(alert.last_price)}</td><td>{[alert.email_enabled && "E-posta", alert.telegram_enabled && "Telegram"].filter(Boolean).join(" · ") || "—"}</td><td><span className={`chip ${alert.active ? "accent" : ""}`}>{alert.active ? "İzleniyor" : "Tetiklendi"}</span></td><td><div className="table-actions"><button className="btn sm" onClick={() => test(alert.id)}>Test</button><button className="btn danger sm" onClick={() => remove(alert.id)}>Sil</button></div></td></tr>)}
     </tbody></table></div>
   </div>;
 }

@@ -97,6 +97,7 @@ h3 { font-size: 1rem; margin: 0 0 .55rem; }
 .prediction-return-table td { font-weight: 750; }
 .sort-button { border: 0; padding: .15rem; margin: -.15rem; background: none; color: inherit; font: inherit; font-weight: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; white-space: nowrap; }
 .sort-button:hover { color: var(--accent); }
+.table-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: .4rem; }
 .band-table caption { text-align: left; padding: .75rem; color: var(--muted); }
 .chip { display: inline-flex; align-items: center; gap: .3rem; font-size: .72rem; font-weight: 700; padding: .2rem .58rem; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
 .chip.accent,.chip.kind-actual { background: var(--accent-weak); color: var(--accent-strong); border-color: transparent; }

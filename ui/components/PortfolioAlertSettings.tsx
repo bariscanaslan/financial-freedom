@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPortfolioAlert, savePortfolioAlert } from "@/lib/api";
+import { getPortfolioAlert, savePortfolioAlert, testPortfolioAlert } from "@/lib/api";
 
 export function PortfolioAlertSettings({ portfolioId }: { portfolioId: string }) {
   const [threshold, setThreshold] = useState(2);
@@ -20,6 +20,11 @@ export function PortfolioAlertSettings({ portfolioId }: { portfolioId: string })
       email_enabled: email, telegram_enabled: telegram, enabled }); setMessage("Portföy alarmı kaydedildi."); }
     catch { setMessage("Portföy alarmı kaydedilemedi."); }
   }
+  async function test() {
+    setMessage("");
+    try { const result = await testPortfolioAlert(portfolioId); setMessage(result.status === "sent" ? `Test gönderildi: ${result.channels.join(", ")}` : result.errors.join(" · ")); }
+    catch { setMessage("Önce alarmı kaydedin ve bildirim ayarlarını kontrol edin."); }
+  }
   return <details className="portfolio-alert-settings">
     <summary>15 dakikalık hareket bildirimi</summary>
     <div className="form-row">
@@ -29,6 +34,7 @@ export function PortfolioAlertSettings({ portfolioId }: { portfolioId: string })
       <label className="check-row"><input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} /> E-posta</label>
       <label className="check-row"><input type="checkbox" checked={telegram} onChange={(e) => setTelegram(e.target.checked)} /> Telegram</label>
       <button type="button" className="btn primary sm" onClick={save}>Kaydet</button>
+      <button type="button" className="btn sm" onClick={test}>Test et</button>
     </div>
     <p className="muted small">Her pozisyonun fiyatı önceki 15 dakikalık gözlemle karşılaştırılır. Eşik yukarı veya aşağı yönde aşılırsa bildirim gönderilir.</p>
     {message && <p className="note" role="status">{message}</p>}
