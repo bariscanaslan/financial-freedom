@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SPP_API_", extra="ignore")
 
     host: str = "127.0.0.1"
-    port: int = 8000
+    port: int = 8089
 
     # Kayitli modellerin kok dizini (registry). Request'ten ASLA dosya yolu
     # alinmaz; ticker -> bu dizinde cozulur.
@@ -30,6 +30,14 @@ class Settings(BaseSettings):
 
     # SQLite veritabani: portfolyo kaydi + event log + kullanilan ticker'lar.
     db_path: Path = PROJECT_ROOT / "portfolio_data" / "app.db"
+
+    # Geçici cache, job state ve dağıtık kilit. Bağlantı kurulamazsa mevcut
+    # bellek/Parquet fallback'leri çalışmaya devam eder. Kapatmak için boş bırakın.
+    redis_url: str | None = "redis://127.0.0.1:6389/0"
+    redis_prefix: str = "financial-freedom"
+    redis_job_ttl_seconds: int = 86_400
+    redis_market_ttl_seconds: int = 720
+    notification_interval_seconds: int = 900
 
     # --- sinirlar (yeni dis yuzey) ---
     max_events_per_request: int = 100

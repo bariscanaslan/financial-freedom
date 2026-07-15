@@ -14,6 +14,7 @@ import { PortfolioBuilder } from "@/components/PortfolioBuilder";
 import { PortfolioValueCard } from "@/components/PortfolioValueCard";
 import { PositionsTable } from "@/components/PositionsTable";
 import { PortfolioTrades } from "@/components/PortfolioTrades";
+import { PortfolioAlertSettings } from "@/components/PortfolioAlertSettings";
 import { Empty, ErrorView, Loading } from "@/components/States";
 import type {
   MetricsResponse,
@@ -110,6 +111,7 @@ export default function PortfolioPage() {
                 metrics={e.metrics}
               />
               <PositionsTable data={e.positions} />
+              <PortfolioAlertSettings portfolioId={e.portfolio.id} />
               <PortfolioTrades
                 portfolioId={e.portfolio.id}
                 trades={e.trades}

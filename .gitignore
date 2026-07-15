@@ -70,3 +70,7 @@ htmlcov/
 .env.*
 !.env.example
 secrets.json
+
+# ------------------------------------------------------------- container
+docker-data/
+*.pid

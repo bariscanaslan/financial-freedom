@@ -7,3 +7,4 @@ fastapi
 uvicorn
 pydantic-settings
 httpx
+redis>=5.0,<6.0

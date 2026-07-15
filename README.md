@@ -1,4 +1,4 @@
-# Stock Price Predictor
+# Financial Freedom
 
 Günlük hisse getirisi için **olasılıksal** tahmin motoru. Çıktı tek bir sayı
 değil, bir dağılımdır: p10 / p50 / p90. Nokta tahmini medyandır (p50), risk
@@ -15,7 +15,37 @@ Bu dosya projenin **ne olduğunu ve nasıl çalıştığını** anlatır. Kararl
 
 ## Backend ve frontend'i çalıştırma
 
-Önce proje kökünde Python ve frontend bağımlılıklarını kurun:
+Önerilen yöntem tüm yapıyı Docker Compose ile çalıştırmaktır:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Varsayılan imaj CPU ile çalışır. NVIDIA Container Toolkit kurulu bir makinede
+CUDA ile eğitim/tahmin için GPU override'ını kullanın:
+
+```bash
+docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+```
+
+Uygulama varsayılan olarak yalnızca bu makineden `http://127.0.0.1:3007`
+adresinde açılır. Redis, API ve UI doğrudan dışarı port yayınlamaz; trafik Nginx
+üzerinden geçer. VPN erişimi için `.env` içindeki `VPN_BIND_ADDRESS` değerini
+sunucunun VPN arayüz IP'siyle değiştirin ve `http://<VPN_IP>:3007` adresini
+kullanın. Servis durumlarını görmek için:
+
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+Veriler `cache/`, modeller `models/`, SQLite kayıtları `portfolio_data/`
+dizinlerinde kalıcıdır. Container'ları durdurmak için `docker compose down`
+kullanın.
+
+Docker kullanmadan geliştirme yapmak için önce proje kökünde Python ve frontend
+bağımlılıklarını kurun:
 
 ```bash
 python3 -m venv .venv
@@ -26,13 +56,24 @@ cp .env.example .env.local
 cd ..
 ```
 
+Redis'i ayrı bir terminalde başlatın:
+
+```bash
+docker compose up -d redis
+```
+
+Varsayılan bağlantı `redis://127.0.0.1:6389/0` adresidir. Farklı bir adres için
+`SPP_API_REDIS_URL` ortam değişkenini ayarlayın. Redis erişilemezse API mevcut
+bellek ve Parquet önbelleğine otomatik döner; kalıcı portföy/tahmin/risk kayıtları
+SQLite içinde kalır.
+
 Backend'i proje kökünde başlatın:
 
 ```bash
-.venv/bin/uvicorn api.main:app --reload
+.venv/bin/uvicorn api.main:app --reload --port 8089
 ```
 
-API `http://127.0.0.1:8000` adresinde çalışır. Ardından ikinci bir terminalde
+API `http://127.0.0.1:8089` adresinde çalışır. Ardından ikinci bir terminalde
 frontend'i başlatın:
 
 ```bash
@@ -40,7 +81,7 @@ cd ui
 npm run dev
 ```
 
-Web arayüzünü `http://localhost:3000` adresinden açabilirsiniz. Farklı bir API
+Web arayüzünü `http://localhost:3007` adresinden açabilirsiniz. Farklı bir API
 adresi kullanacaksanız `ui/.env.local` içindeki `NEXT_PUBLIC_API_URL` değerini
 güncelleyin.
 

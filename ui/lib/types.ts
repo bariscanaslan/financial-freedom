@@ -8,6 +8,40 @@ export interface Health {
   loaded_models: number;
 }
 
+export interface NotificationSettings {
+  email: string;
+  resend_from_email: string;
+  telegram_chat_id: string;
+  email_enabled: boolean;
+  telegram_enabled: boolean;
+  has_resend_api_key: boolean;
+  has_telegram_bot_token: boolean;
+  updated_at: string | null;
+}
+
+export interface PortfolioAlert {
+  portfolio_id: string;
+  threshold_pct: number;
+  email_enabled: boolean;
+  telegram_enabled: boolean;
+  enabled: boolean;
+  updated_at: string;
+}
+
+export interface WatchlistAlert {
+  id: string;
+  ticker: string;
+  direction: "above" | "below";
+  target_price: number;
+  email_enabled: boolean;
+  telegram_enabled: boolean;
+  active: boolean;
+  last_price: number | null;
+  triggered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ModelSummary {
   ticker: string | null;
   saved_at: string | null;

@@ -20,6 +20,7 @@ from .errors import BadRequest, NotFound
 from .services.db import Database
 from .services.model_cache import ModelCache
 from .services.price_provider import PriceProvider
+from .services.redis_backend import RedisBackend
 from .services.training import TrainingManager
 from .services.portfolio_drafts import PortfolioDraftManager
 
@@ -36,6 +37,10 @@ def get_model_cache(request: Request) -> ModelCache:
 
 def get_price_provider(request: Request) -> PriceProvider:
     return request.app.state.price_provider
+
+
+def get_redis_backend(request: Request) -> RedisBackend:
+    return request.app.state.redis
 
 
 def get_db(request: Request) -> Database:

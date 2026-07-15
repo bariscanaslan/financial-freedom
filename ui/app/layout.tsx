@@ -8,7 +8,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Hisse Fiyatı Tahmincisi",
+  title: "Financial Freedom",
   description:
     "Olasılıksal günlük getiri tahmini ve portföy takibi. Yatırım tavsiyesi değildir.",
 };

@@ -11,6 +11,7 @@ import type {
   InvestRequest,
   MarketOverviewResponse,
   MetricsResponse,
+  NotificationSettings,
   ModelsResponse,
   PortfolioForecastResponse,
   PortfolioDraft,
@@ -18,6 +19,7 @@ import type {
   PortfolioEvaluation,
   PortfolioEvaluationsResponse,
   PortfolioKind,
+  PortfolioAlert,
   PortfoliosResponse,
   PortfolioSummary,
   PositionResponse,
@@ -34,6 +36,7 @@ import type {
   Trade,
   TradesResponse,
   ValueSeriesResponse,
+  WatchlistAlert,
 } from "./types";
 
 export class ApiError extends Error {
@@ -121,6 +124,30 @@ export const refreshAllMarketCaches = () =>
   req<{ total: number; refreshed: number; failed: string[] }>("/market/cache/refresh-all", { method: "POST" });
 
 export const getTickers = () => req<TickersResponse>("/tickers");
+
+export const getNotificationSettings = () =>
+  req<NotificationSettings>("/notification-settings");
+export const saveNotificationSettings = (body: {
+  email: string; resend_api_key: string; resend_from_email: string;
+  telegram_bot_token: string; telegram_chat_id: string;
+  email_enabled: boolean; telegram_enabled: boolean;
+}) => req<NotificationSettings>("/notification-settings", { method: "PUT", body: JSON.stringify(body) });
+export const testNotifications = () =>
+  req<{ status: string; channels: string[]; errors: string[] }>("/notification-settings/test", { method: "POST" });
+export const getPortfolioAlert = (id: string) =>
+  req<PortfolioAlert | null>(`/portfolios/${pid(id)}/alert`);
+export const savePortfolioAlert = (id: string, body: {
+  threshold_pct: number; email_enabled: boolean; telegram_enabled: boolean; enabled: boolean;
+}) => req<PortfolioAlert>(`/portfolios/${pid(id)}/alert`, { method: "PUT", body: JSON.stringify(body) });
+export const listWatchlist = () => req<{ count: number; alerts: WatchlistAlert[] }>("/watchlist");
+export const getWatchlistQuote = (ticker: string) =>
+  req<{ ticker: string; price: number; as_of: string }>(`/watchlist/quote?ticker=${encodeURIComponent(ticker)}`);
+export const createWatchlistAlert = (body: {
+  ticker: string; direction: "above" | "below"; target_price: number;
+  email_enabled: boolean; telegram_enabled: boolean;
+}) => req<WatchlistAlert>("/watchlist", { method: "POST", body: JSON.stringify(body) });
+export const deleteWatchlistAlert = (id: string) =>
+  req<{ id: string; deleted: boolean }>(`/watchlist/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 const pid = (id: string) => encodeURIComponent(id);
 

@@ -545,3 +545,74 @@ class TrackedTicker(BaseModel):
 class TickersResponse(BaseModel):
     count: int
     tickers: list[TrackedTicker]
+
+
+# ----------------------------------------------------------- notifications
+class NotificationSettingsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: str = Field(default="", max_length=320)
+    resend_api_key: str = Field(default="", max_length=500)
+    resend_from_email: str = Field(default="", max_length=320)
+    telegram_bot_token: str = Field(default="", max_length=500)
+    telegram_chat_id: str = Field(default="", max_length=100)
+    email_enabled: bool = False
+    telegram_enabled: bool = False
+
+
+class NotificationSettingsResponse(BaseModel):
+    email: str
+    resend_from_email: str
+    telegram_chat_id: str
+    email_enabled: bool
+    telegram_enabled: bool
+    has_resend_api_key: bool
+    has_telegram_bot_token: bool
+    updated_at: str | None = None
+
+
+class PortfolioAlertUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    threshold_pct: float = Field(gt=0, le=100)
+    email_enabled: bool = False
+    telegram_enabled: bool = False
+    enabled: bool = True
+
+
+class PortfolioAlertResponse(PortfolioAlertUpdate):
+    portfolio_id: str
+    updated_at: str
+
+
+class WatchlistAlertCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ticker: str
+    direction: str
+    target_price: float = Field(gt=0, le=_MAX_PRICE)
+    email_enabled: bool = False
+    telegram_enabled: bool = False
+
+    @field_validator("ticker")
+    @classmethod
+    def _ticker(cls, value: str) -> str:
+        return _validate_ticker(value)
+
+    @field_validator("direction")
+    @classmethod
+    def _direction(cls, value: str) -> str:
+        if value not in {"above", "below"}:
+            raise ValueError("invalid direction")
+        return value
+
+
+class WatchlistAlertResponse(WatchlistAlertCreate):
+    id: str
+    active: bool
+    last_price: float | None = None
+    triggered_at: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class WatchlistAlertsResponse(BaseModel):
+    count: int
+    alerts: list[WatchlistAlertResponse]

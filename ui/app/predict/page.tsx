@@ -141,9 +141,9 @@ function ForecastResult({ data }: { data: ForecastResponse }) {
         ))}
       </div>
 
-      <div className="table-scroll">
+      <div className="table-scroll prediction-return-table">
         <table className="data-table">
-          <caption className="muted" style={{ textAlign: "left" }}>
+          <caption className="muted">
             Getiri alanı (modelin gerçekten tahmin ettiği değer)
           </caption>
           <tbody>

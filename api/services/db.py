@@ -78,6 +78,54 @@ CREATE TABLE IF NOT EXISTS portfolio_evaluations (
     payload      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_portfolio_evaluations_pid ON portfolio_evaluations(portfolio_id);
+CREATE TABLE IF NOT EXISTS notification_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    email TEXT NOT NULL DEFAULT '',
+    resend_api_key TEXT NOT NULL DEFAULT '',
+    resend_from_email TEXT NOT NULL DEFAULT '',
+    telegram_bot_token TEXT NOT NULL DEFAULT '',
+    telegram_chat_id TEXT NOT NULL DEFAULT '',
+    email_enabled INTEGER NOT NULL DEFAULT 0,
+    telegram_enabled INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS portfolio_alerts (
+    portfolio_id TEXT PRIMARY KEY REFERENCES portfolios(id) ON DELETE CASCADE,
+    threshold_pct REAL NOT NULL,
+    email_enabled INTEGER NOT NULL DEFAULT 0,
+    telegram_enabled INTEGER NOT NULL DEFAULT 0,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS portfolio_alert_observations (
+    portfolio_id TEXT NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+    ticker TEXT NOT NULL,
+    last_price REAL NOT NULL,
+    checked_at TEXT NOT NULL,
+    PRIMARY KEY (portfolio_id, ticker)
+);
+CREATE TABLE IF NOT EXISTS watchlist_alerts (
+    id TEXT PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    direction TEXT NOT NULL CHECK (direction IN ('above','below')),
+    target_price REAL NOT NULL,
+    email_enabled INTEGER NOT NULL DEFAULT 0,
+    telegram_enabled INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    last_price REAL,
+    triggered_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS notification_events (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    channels TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 _KINDS = ("actual", "simulated")
@@ -343,3 +391,137 @@ class Database:
             ).fetchone()
         return None if row is None else {"id": row["id"], "portfolio_id": row["portfolio_id"],
             "created_at": row["created_at"], **json.loads(row["payload"])}
+
+    # --------------------------------------------------------- notifications
+    def get_notification_settings(self, *, include_secrets: bool = False) -> dict:
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM notification_settings WHERE id = 1").fetchone()
+        data = dict(row) if row else {
+            "email": "", "resend_api_key": "", "resend_from_email": "",
+            "telegram_bot_token": "", "telegram_chat_id": "",
+            "email_enabled": 0, "telegram_enabled": 0, "updated_at": None,
+        }
+        data["email_enabled"] = bool(data["email_enabled"])
+        data["telegram_enabled"] = bool(data["telegram_enabled"])
+        if not include_secrets:
+            data["has_resend_api_key"] = bool(data.pop("resend_api_key", ""))
+            data["has_telegram_bot_token"] = bool(data.pop("telegram_bot_token", ""))
+        return data
+
+    def save_notification_settings(self, values: dict) -> dict:
+        current = self.get_notification_settings(include_secrets=True)
+        for secret in ("resend_api_key", "telegram_bot_token"):
+            if not values.get(secret):
+                values[secret] = current.get(secret, "")
+        now = _now()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO notification_settings (id,email,resend_api_key,resend_from_email,"
+                "telegram_bot_token,telegram_chat_id,email_enabled,telegram_enabled,updated_at) "
+                "VALUES (1,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                "email=excluded.email,resend_api_key=excluded.resend_api_key,"
+                "resend_from_email=excluded.resend_from_email,telegram_bot_token=excluded.telegram_bot_token,"
+                "telegram_chat_id=excluded.telegram_chat_id,email_enabled=excluded.email_enabled,"
+                "telegram_enabled=excluded.telegram_enabled,updated_at=excluded.updated_at",
+                (values.get("email", ""), values["resend_api_key"], values.get("resend_from_email", ""),
+                 values["telegram_bot_token"], values.get("telegram_chat_id", ""),
+                 int(values.get("email_enabled", False)), int(values.get("telegram_enabled", False)), now),
+            )
+            self._conn.commit()
+        return self.get_notification_settings()
+
+    def upsert_portfolio_alert(self, portfolio_id: str, values: dict) -> dict:
+        now = _now()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO portfolio_alerts VALUES (?,?,?,?,?,?) ON CONFLICT(portfolio_id) DO UPDATE SET "
+                "threshold_pct=excluded.threshold_pct,email_enabled=excluded.email_enabled,"
+                "telegram_enabled=excluded.telegram_enabled,enabled=excluded.enabled,updated_at=excluded.updated_at",
+                (portfolio_id, values["threshold_pct"], int(values.get("email_enabled", False)),
+                 int(values.get("telegram_enabled", False)), int(values.get("enabled", True)), now),
+            )
+            self._conn.commit()
+        return self.get_portfolio_alert(portfolio_id)
+
+    def get_portfolio_alert(self, portfolio_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM portfolio_alerts WHERE portfolio_id = ?", (portfolio_id,)).fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        for key in ("email_enabled", "telegram_enabled", "enabled"):
+            data[key] = bool(data[key])
+        return data
+
+    def list_portfolio_alerts(self) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM portfolio_alerts WHERE enabled = 1").fetchall()
+        return [{**dict(row), "email_enabled": bool(row["email_enabled"]),
+                 "telegram_enabled": bool(row["telegram_enabled"]), "enabled": bool(row["enabled"])} for row in rows]
+
+    def get_alert_observation(self, portfolio_id: str, ticker: str) -> float | None:
+        with self._lock:
+            row = self._conn.execute("SELECT last_price FROM portfolio_alert_observations WHERE portfolio_id=? AND ticker=?",
+                                     (portfolio_id, ticker)).fetchone()
+        return None if row is None else float(row["last_price"])
+
+    def set_alert_observation(self, portfolio_id: str, ticker: str, price: float) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO portfolio_alert_observations VALUES (?,?,?,?) ON CONFLICT(portfolio_id,ticker) "
+                "DO UPDATE SET last_price=excluded.last_price,checked_at=excluded.checked_at",
+                (portfolio_id, ticker, price, _now()),
+            )
+            self._conn.commit()
+
+    def create_watchlist_alert(self, values: dict) -> dict:
+        alert_id, now = f"watch_{uuid.uuid4().hex[:16]}", _now()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO watchlist_alerts (id,ticker,direction,target_price,email_enabled,telegram_enabled,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (alert_id, values["ticker"], values["direction"], values["target_price"],
+                 int(values.get("email_enabled", False)), int(values.get("telegram_enabled", False)), now, now),
+            )
+            self._conn.commit()
+        return self.get_watchlist_alert(alert_id)
+
+    def list_watchlist_alerts(self, *, active_only: bool = False) -> list[dict]:
+        query = "SELECT * FROM watchlist_alerts" + (" WHERE active = 1" if active_only else "") + " ORDER BY created_at DESC"
+        with self._lock:
+            rows = self._conn.execute(query).fetchall()
+        return [self._watchlist_row(row) for row in rows]
+
+    def get_watchlist_alert(self, alert_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM watchlist_alerts WHERE id = ?", (alert_id,)).fetchone()
+        return None if row is None else self._watchlist_row(row)
+
+    @staticmethod
+    def _watchlist_row(row) -> dict:
+        data = dict(row)
+        for key in ("email_enabled", "telegram_enabled", "active"):
+            data[key] = bool(data[key])
+        return data
+
+    def update_watchlist_observation(self, alert_id: str, price: float, *, triggered: bool = False) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE watchlist_alerts SET last_price=?,triggered_at=?,active=?,updated_at=? WHERE id=?",
+                (price, _now() if triggered else None, 0 if triggered else 1, _now(), alert_id),
+            )
+            self._conn.commit()
+
+    def delete_watchlist_alert(self, alert_id: str) -> bool:
+        with self._lock:
+            cur = self._conn.execute("DELETE FROM watchlist_alerts WHERE id = ?", (alert_id,))
+            self._conn.commit()
+        return cur.rowcount > 0
+
+    def save_notification_event(self, kind: str, subject: str, message: str,
+                                channels: list[str], status: str) -> None:
+        with self._lock:
+            self._conn.execute("INSERT INTO notification_events VALUES (?,?,?,?,?,?,?)",
+                (f"notify_{uuid.uuid4().hex[:16]}", kind, subject, message,
+                 json.dumps(channels), status, _now()))
+            self._conn.commit()

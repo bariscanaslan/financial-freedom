@@ -19,6 +19,9 @@ from data.calendar import to_market_date
 class PriceProvider:
     """Uretim saglayicisi: loader.fetch (cache-first)."""
 
+    def __init__(self, redis_backend=None):
+        self._redis = redis_backend
+
     def recent(self, ticker: str) -> pd.DataFrame:
         # NOT: ticker cache'te yoksa ilk cagri AG'a gider (yfinance). Sonraki
         # cagrilar cache'ten okur. Request basina canli indirme YOKTUR.
@@ -29,7 +32,9 @@ class PriceProvider:
         return fetch(ticker, force=True)
 
     def refresh_intraday(self, ticker: str) -> pd.DataFrame:
-        return fetch_intraday(ticker, force=True)
+        frame = fetch_intraday(ticker, force=True)
+        self._cache_quote(ticker, frame)
+        return frame
 
     def cached_tickers(self) -> list[str]:
         return sorted(path.stem.upper() for path in RAW_DIR.glob("*.parquet"))
@@ -40,11 +45,28 @@ class PriceProvider:
         return fetch_many(list(tickers))
 
     def latest_quote(self, ticker: str) -> tuple[float, pd.Timestamp]:
+        key = f"market:quote:{ticker.upper()}"
+        cached = self._redis.get_json(key) if self._redis else None
+        if cached:
+            return float(cached["price"]), pd.Timestamp(cached["timestamp"])
         frame = fetch_intraday(ticker)
         series = frame["adj_close"].dropna()
         if series.empty:
             raise ValueError(f"{ticker}: güncel fiyat yok")
-        return float(series.iloc[-1]), pd.Timestamp(series.index[-1])
+        value, timestamp = float(series.iloc[-1]), pd.Timestamp(series.index[-1])
+        if self._redis:
+            self._redis.set_json(key, {"price": value, "timestamp": timestamp.isoformat()},
+                                 self._redis.market_ttl)
+        return value, timestamp
+
+    def _cache_quote(self, ticker: str, frame: pd.DataFrame) -> None:
+        if not self._redis or frame.empty or "adj_close" not in frame:
+            return
+        series = frame["adj_close"].dropna()
+        if not series.empty:
+            self._redis.set_json(f"market:quote:{ticker.upper()}",
+                {"price": float(series.iloc[-1]), "timestamp": pd.Timestamp(series.index[-1]).isoformat()},
+                self._redis.market_ttl)
 
     def frames_live(self, tickers: list[str]) -> dict[str, pd.DataFrame]:
         frames = self.frames(tickers)

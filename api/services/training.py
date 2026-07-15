@@ -24,10 +24,12 @@ def _clean(value):
 
 
 class TrainingManager:
-    def __init__(self, models_dir: str | Path, device: str | None, prices):
+    def __init__(self, models_dir: str | Path, device: str | None, prices, redis_backend=None):
         self._models_dir = Path(models_dir)
         self._device = device
         self._prices = prices
+        self._redis = redis_backend
+        self._lock_tokens: dict[str, str] = {}
         self._jobs: dict[str, dict] = {}
         self._lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="model-training")
@@ -46,6 +48,9 @@ class TrainingManager:
             if any(j["status"] in {"queued", "preparing", "training", "evaluating"}
                    for j in self._jobs.values()):
                 raise BadRequest("Başka bir model eğitimi devam ediyor.")
+            token = self._redis.acquire("training", 6 * 60 * 60) if self._redis else "memory"
+            if token is None:
+                raise BadRequest("Başka bir instance üzerinde model eğitimi devam ediyor.")
             job_id = uuid.uuid4().hex
             job = {
                 "id": job_id,
@@ -65,19 +70,34 @@ class TrainingManager:
                 "error": None,
             }
             self._jobs[job_id] = job
+            self._lock_tokens[job_id] = token
+        self._persist(job_id)
         self._executor.submit(self._run, job_id)
         return self.get(job_id)
 
     def get(self, job_id: str) -> dict:
         with self._lock:
             if job_id not in self._jobs:
-                raise NotFound("Eğitim işi bulunamadı.")
+                cached = self._redis.get_json(f"job:training:{job_id}") if self._redis else None
+                if cached is None:
+                    raise NotFound("Eğitim işi bulunamadı.")
+                return cached
             job = self._jobs[job_id]
             return {**job, "history": [dict(row) for row in job["history"]]}
 
     def _update(self, job_id: str, **values) -> None:
         with self._lock:
             self._jobs[job_id].update(values)
+        self._persist(job_id)
+
+    def _persist(self, job_id: str) -> None:
+        if not self._redis:
+            return
+        with self._lock:
+            job = dict(self._jobs[job_id])
+            job["history"] = [dict(row) for row in job["history"]]
+        self._redis.set_json(f"job:training:{job_id}", job)
+        self._redis.publish(f"progress:training:{job_id}", job)
 
     def _on_progress(self, job_id: str, update: dict) -> None:
         if update["event"] == "started":
@@ -98,6 +118,7 @@ class TrainingManager:
                 job["history"].append(row)
                 job["progress"] = update["epoch"] / update["max_epochs"]
                 job["stage"] = f"Epoch {update['epoch']} / {update['max_epochs']}"
+            self._persist(job_id)
         elif update["event"] == "early_stopping":
             self._update(job_id, stage=f"Erken durdurma: epoch {update['epoch']}")
 
@@ -159,3 +180,7 @@ class TrainingManager:
                 error=str(exc),
                 finished_at=_now(),
             )
+        finally:
+            token = self._lock_tokens.pop(job_id, None)
+            if self._redis:
+                self._redis.release("training", token)
