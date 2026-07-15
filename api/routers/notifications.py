@@ -32,7 +32,7 @@ def test_notification(body: NotificationTestRequest, request: Request, db=Depend
     }
     result = request.app.state.notification_service.send(
         "Financial Freedom test bildirimi", "Bildirim ayarlarınız başarıyla çalışıyor.",
-        choices, kind="test")
+        choices, kind="test", trend="neutral")
     return result
 
 
@@ -55,7 +55,7 @@ def test_portfolio_alert(request: Request, pid: str = Depends(require_portfolio)
     return request.app.state.notification_service.send(
         f"{portfolio['name']} portföy alarmı testi",
         f"%{alert['threshold_pct']:.2f} hareket eşiği için test bildirimi. Gerçek alarm durumu değiştirilmedi.",
-        alert, kind="portfolio_test")
+        alert, kind="portfolio_test", trend="neutral")
 
 
 @router.get("/watchlist", response_model=WatchlistAlertsResponse)
@@ -93,7 +93,8 @@ def test_watchlist_alert(alert_id: str, request: Request, db=Depends(get_db)):
     return request.app.state.notification_service.send(
         f"{alert['ticker']} takip alarmı testi",
         f"${alert['target_price']:.2f} hedefine {direction} bildirimi test edildi. Alarm durumu değiştirilmedi.",
-        alert, kind="watchlist_test")
+        alert, kind="watchlist_test",
+        trend="up" if alert["direction"] == "above" else "down")
 
 
 @router.delete("/watchlist/{alert_id}")
