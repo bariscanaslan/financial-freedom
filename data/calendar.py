@@ -16,7 +16,9 @@ def to_market_date(ts) -> pd.Timestamp:
     """Herhangi bir timestamp'i borsa saat diliminde, saatsiz bir gune cevirir."""
     ts = pd.Timestamp(ts)
     if ts.tz is None:
-        ts = ts.tz_localize("UTC")
+        # yfinance günlük barları saatsiz borsa tarihleri olarak döner. Bunları
+        # UTC saymak tarihi New York'a çevirirken bir gün geriye kaydırır.
+        return ts.normalize()
     return ts.tz_convert(MARKET_TZ).normalize().tz_localize(None)
 
 

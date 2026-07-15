@@ -28,6 +28,10 @@ ENV/
 # Indirilmis OHLCV parquet cache'i (data/config.py -> CACHE_DIR)
 cache/
 
+# Kullanici portfolyo event log'lari (portfolio/config.py -> PORTFOLIO_DIR).
+# Kisisel islem verisi -- repoya girmez.
+portfolio_data/
+
 # Egitilmis modeller: model.pt (binary agirliklar) + meta.json
 #
 # NOT -- DENETLENEBILIRLIK: bir modeli URETIME alirsan, o modelin

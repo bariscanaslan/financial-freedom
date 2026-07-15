@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
@@ -25,6 +26,8 @@ from .config import (
     MIN_BARS,
     OHLCV_COLS,
     RAW_DIR,
+    INTRADAY_DIR,
+    INTRADAY_CACHE_MINUTES,
 )
 
 log = logging.getLogger(__name__)
@@ -82,6 +85,23 @@ def _is_fresh(path) -> bool:
     return age < timedelta(hours=CACHE_TTL_HOURS)
 
 
+def _quarantine(path: Path) -> None:
+    """Bozuk cache'i silmeden kenara al; sonraki adım temiz indirme yapar."""
+    if not path.exists():
+        return
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path.replace(path.with_suffix(f".parquet.corrupt-{stamp}"))
+
+
+def _read_cache(path: Path, ticker: str) -> pd.DataFrame:
+    try:
+        return pd.read_parquet(path)
+    except Exception as exc:  # noqa: BLE001
+        log.error("%s: parquet cache bozuk, karantinaya aliniyor (%s)", ticker, exc)
+        _quarantine(path)
+        raise DataError(f"{ticker}: bozuk fiyat cache'i yenilenmeli") from exc
+
+
 # -------------------------------------------------------------------- fetch
 def fetch(
     ticker: str,
@@ -101,7 +121,15 @@ def fetch(
 
     if not force and _is_fresh(path):
         log.debug("%s: cache hit", ticker)
-        df = pd.read_parquet(path)
+        try:
+            df = _read_cache(path, ticker)
+        except DataError:
+            return fetch(ticker, start=start, end=end, force=True, retries=retries)
+        # Eski normalizasyon saatsiz günlük barları UTC sayıp bir gün geri
+        # kaydırıyordu. Hafta sonu etiketi bu cache'in kesin işaretidir.
+        if any(pd.Timestamp(day).weekday() >= 5 for day in df.index):
+            log.warning("%s: eski tarihli cache yenileniyor", ticker)
+            return fetch(ticker, start=start, end=end, force=True, retries=retries)
     else:
         last_err = None
         for attempt in range(retries):
@@ -115,7 +143,9 @@ def fetch(
                     threads=False,
                 )
                 df = _normalize(raw, ticker)
-                df.to_parquet(path)
+                tmp = path.with_suffix(".parquet.tmp")
+                df.to_parquet(tmp)
+                tmp.replace(path)
                 log.info("%s: %d bar indirildi", ticker, len(df))
                 break
             except Exception as e:  # noqa: BLE001
@@ -127,7 +157,7 @@ def fetch(
         else:
             if path.exists():
                 log.warning("%s: indirme basarisiz, BAYAT cache kullaniliyor", ticker)
-                df = pd.read_parquet(path)
+                df = _read_cache(path, ticker)
             else:
                 raise DataError(f"{ticker}: indirilemedi ({last_err})") from last_err
 
@@ -173,3 +203,31 @@ def fetch_many(
         log.warning("%d ticker atlandi: %s", len(failed), failed)
 
     return out
+
+
+def fetch_intraday(ticker: str, *, force: bool = False) -> pd.DataFrame:
+    """Son 5 günün 15 dakikalık barlarını ayrı ve kısa ömürlü cache'te tutar."""
+    ticker = ticker.upper().strip()
+    path = INTRADAY_DIR / f"{ticker}.parquet"
+    fresh = path.exists() and datetime.now() - datetime.fromtimestamp(path.stat().st_mtime) < timedelta(minutes=INTRADAY_CACHE_MINUTES)
+    if not force and fresh:
+        return pd.read_parquet(path)
+    raw = yf.download(ticker, period="5d", interval="15m", auto_adjust=False,
+                      progress=False, threads=False)
+    if raw is None or raw.empty:
+        if path.exists():
+            return pd.read_parquet(path)
+        raise DataError(f"{ticker}: 15 dakikalık veri alınamadı")
+    frame = raw.copy()
+    if isinstance(frame.columns, pd.MultiIndex):
+        frame.columns = frame.columns.get_level_values(0)
+    frame.columns = [str(column).strip().lower().replace(" ", "_") for column in frame.columns]
+    frame = frame.rename(columns={"adjclose": "adj_close"})
+    if "adj_close" not in frame and "close" in frame:
+        frame["adj_close"] = frame["close"]
+    frame = frame[[column for column in OHLCV_COLS if column in frame]].astype("float64")
+    frame.index = pd.DatetimeIndex(frame.index, name="timestamp")
+    tmp = path.with_suffix(".parquet.tmp")
+    frame.to_parquet(tmp)
+    tmp.replace(path)
+    return frame

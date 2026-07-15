@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass, field
+from typing import Callable
 
 import numpy as np
 import torch
@@ -108,7 +109,12 @@ def _loader(X: np.ndarray, y: np.ndarray, batch_size: int, shuffle: bool) -> Dat
     )
 
 
-def train(dataset: Dataset, cfg: ModelConfig | None = None, verbose: bool = True) -> TrainedModel:
+def train(
+    dataset: Dataset,
+    cfg: ModelConfig | None = None,
+    verbose: bool = True,
+    progress: Callable[[dict], None] | None = None,
+) -> TrainedModel:
     """
     dataset + cfg -> TrainedModel
 
@@ -140,6 +146,17 @@ def train(dataset: Dataset, cfg: ModelConfig | None = None, verbose: bool = True
         horizon=cfg.horizon,
         dropout=cfg.dropout,
     ).to(device)
+
+    if progress is not None:
+        progress({
+            "event": "started",
+            "device": str(device),
+            "parameters": net.n_params(),
+            "train_samples": len(dataset.X_train),
+            "val_samples": len(dataset.X_val),
+            "test_samples": len(dataset.X_test),
+            "max_epochs": cfg.max_epochs,
+        })
 
     # foreach=False: Adam'in fuse edilmis foreach_addcdiv kernel'i XPU'da
     # ard arda cok sayida model egitilirken ara sira native cokme uretiyor
@@ -194,6 +211,15 @@ def train(dataset: Dataset, cfg: ModelConfig | None = None, verbose: bool = True
 
         history.append({"epoch": epoch, "train_loss": tr_loss, "val_loss": va_loss})
 
+        if progress is not None:
+            progress({
+                "event": "epoch",
+                "epoch": epoch,
+                "train_loss": tr_loss,
+                "val_loss": va_loss,
+                "max_epochs": cfg.max_epochs,
+            })
+
         # ---- early stopping (VAL uzerinde) ----
         if va_loss < best_val - 1e-6:
             best_val = va_loss
@@ -209,6 +235,13 @@ def train(dataset: Dataset, cfg: ModelConfig | None = None, verbose: bool = True
                   f"{'  *' if best_epoch == epoch else ''}")
 
         if bad_epochs >= cfg.patience:
+            if progress is not None:
+                progress({
+                    "event": "early_stopping",
+                    "epoch": epoch,
+                    "best_epoch": best_epoch,
+                    "best_val_loss": best_val,
+                })
             if verbose:
                 print(f"  early stop @ epoch {epoch} "
                       f"(en iyi: epoch {best_epoch}, val={best_val:.6f})")

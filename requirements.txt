@@ -1,0 +1,9 @@
+numpy
+pandas
+torch
+yfinance
+pyarrow
+fastapi
+uvicorn
+pydantic-settings
+httpx

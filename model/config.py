@@ -19,6 +19,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_DIR = PROJECT_ROOT / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
+FORECAST_PERIODS = (
+    ("daily", "Günlük", 1), ("weekly", "Haftalık", 5),
+    ("monthly", "Aylık", 21), ("quarterly", "3 Aylık", 63),
+    ("half_year", "6 Aylık", 126), ("yearly", "1 Yıllık", 252),
+    ("two_year", "2 Yıllık", 504),
+)
+SUPPORTED_HORIZONS = tuple(days for _, _, days in FORECAST_PERIODS if days >= 21)
+
 
 # ------------------------------------------------------------------- device
 # Cihaz mantigi model/device.py'de. Burasi sadece ince bir kabuk --
@@ -91,6 +99,8 @@ class ModelConfig:
     ewma_lambda: float = 0.94  # RiskMetrics standardi (gunluk seri)
 
     def __post_init__(self) -> None:
+        if self.horizon < 1 or self.horizon > 504:
+            raise ValueError("horizon 1 ile 504 işlem günü arasında olmalı")
         q = tuple(float(x) for x in self.quantiles)
         if list(q) != sorted(q):
             raise ValueError(f"quantiles sirali olmali: {q}")

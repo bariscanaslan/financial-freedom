@@ -30,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.dataset import build_dataset  # noqa: E402
 from model.config import ModelConfig, get_device  # noqa: E402
-from model.evaluate import evaluate  # noqa: E402
-from model.predict import predict  # noqa: E402
+from model.evaluate import evaluate, evaluate_milestones  # noqa: E402
+from model.predict import aggregate_quantile_path, predict  # noqa: E402
 from model.registry import load, save  # noqa: E402
 from model.train import seed_everything, train  # noqa: E402
 
@@ -79,6 +79,9 @@ def make_gbm(
 # ----------------------------------------------------------------------- main
 def main() -> int:
     print("=" * 72)
+    path = np.tile(np.array([-0.02, 0.001, 0.02]), (504, 1))
+    cumulative = aggregate_quantile_path(path, 1)
+    check(cumulative[2] < 1.0, "uzun vade belirsizligi doğrusal patlamıyor")
     print("SMOKE TEST -- sentetik GBM (sinyal YOK, oynaklik rejimi VAR)")
     print(f"device: {get_device()}")
     print("=" * 72)
@@ -126,6 +129,7 @@ def main() -> int:
     # ---------------------------------------------------- 4) degerlendirme
     print("\n[4] degerlendirme")
     table = evaluate(ds, model, verbose=True)
+    check("daily" in evaluate_milestones(ds, model), "gunluk vade metrigi hesaplandi")
 
     naive_row = table[table["model"] == "naive (r=0)"]
     check(len(naive_row) == 1, "naive TABLODA")

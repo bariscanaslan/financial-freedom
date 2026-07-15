@@ -34,6 +34,7 @@ class Forecast:
     quantiles: tuple[float, ...]
     returns: dict[str, float]  # {"p10": ..., "p50": ..., "p90": ...} log getiri
     prices: dict[str, float]   # ayni quantile'lar, fiyat cinsinden
+    periods: dict[str, dict]   # daily/weekly/monthly cok adimli tahminler
 
     @property
     def uncertainty(self) -> float:
@@ -70,7 +71,23 @@ class Forecast:
             "prices": self.prices,
             "uncertainty": self.uncertainty,
             "uncertainty_pct": self.uncertainty_pct,
+            "periods": self.periods,
         }
+
+
+def aggregate_quantile_path(steps: np.ndarray, median_idx: int) -> np.ndarray:
+    """Günlük log-getiri quantile yolunu bağımsız hata varsayımıyla toplar."""
+    path = np.asarray(steps, dtype=np.float64)
+    medians = path[:, median_idx]
+    center = float(medians.sum())
+    cumulative = np.empty(path.shape[1], dtype=np.float64)
+    for index in range(path.shape[1]):
+        if index == median_idx:
+            cumulative[index] = center
+        else:
+            distance = float(np.sqrt(np.sum((path[:, index] - medians) ** 2)))
+            cumulative[index] = center - distance if index < median_idx else center + distance
+    return cumulative
 
 
 def _qname(q: float) -> str:
@@ -162,12 +179,34 @@ def predict(
         as_of = window.index[-1]
 
     pred = model.predict(X)                          # (1, horizon, Q) -- log getiri
-    step0 = pred[0, 0, :]                            # ilk ufuk adimi
+    steps = pred[0]                                  # (horizon, Q)
+    step0 = steps[0]
 
     anchor = float(price.loc[as_of])                 # as_of gununun kapanisi
     prices = anchor * np.exp(step0)                  # P = anchor * exp(r)
 
     names = [_qname(q) for q in quantiles]
+    periods = {}
+    from model.config import FORECAST_PERIODS
+    for key, label, days in FORECAST_PERIODS:
+        if len(steps) < days:
+            continue
+        # Medyan log getiriler toplanır; belirsizlik doğrusal değil RSS ile
+        # büyür. Böylece aynı günlük uç senaryonun 504 kez gerçekleştiğini
+        # varsayan ve uzun vadede fiyatları patlatan komonotonik yol önlenir.
+        cumulative = aggregate_quantile_path(steps[:days], quantiles.index(0.5))
+        period_prices = anchor * np.exp(cumulative)
+        ret = {n: float(v) for n, v in zip(names, cumulative)}
+        px = {n: float(v) for n, v in zip(names, period_prices)}
+        periods[key] = {
+            "label": label,
+            "trading_days": days,
+            "returns": ret,
+            "prices": px,
+            "uncertainty": float(period_prices[-1] - period_prices[0]),
+            "uncertainty_pct": float((period_prices[-1] - period_prices[0]) / anchor),
+            "aggregation": "root_sum_square",
+        }
     return Forecast(
         ticker=(ticker or "?").upper(),
         as_of=pd.Timestamp(as_of),
@@ -176,6 +215,7 @@ def predict(
         quantiles=quantiles,
         returns={n: float(v) for n, v in zip(names, step0)},
         prices={n: float(v) for n, v in zip(names, prices)},
+        periods=periods,
     )
 
 

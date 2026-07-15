@@ -19,6 +19,7 @@ from data.dataset import Dataset
 
 from .baselines import NaiveModel, QuantileForecaster, default_baselines
 from .metrics import evaluate_predictions, skill_score
+from .config import FORECAST_PERIODS
 
 # Tabloda gosterim sirasi
 _COLS = [
@@ -108,6 +109,40 @@ def evaluate(
         print(report(df, dataset))
 
     return df
+
+
+def evaluate_milestones(dataset: Dataset, model: QuantileForecaster) -> dict[str, dict]:
+    """Her desteklenen yatırım vadesini kümülatif getiri olarak ayrı değerlendirir."""
+    y = dataset.scaler.inverse(dataset.y_test)
+    pred = model.predict(dataset.X_test)
+    qs = list(model.quantiles)
+    median = qs.index(0.5)
+    out = {}
+    for key, label, days in FORECAST_PERIODS:
+        if days > dataset.horizon:
+            continue
+        actual = y[:, :days].sum(axis=1)
+        daily = pred[:, :days, :]
+        medians = daily[:, :, median]
+        center = medians.sum(axis=1)
+        predicted = np.empty((len(daily), len(qs)), dtype=np.float64)
+        for index in range(len(qs)):
+            if index == median:
+                predicted[:, index] = center
+            else:
+                distance = np.sqrt(np.sum((daily[:, :, index] - medians) ** 2, axis=1))
+                predicted[:, index] = center - distance if index < median else center + distance
+        naive_rmse = float(np.sqrt(np.mean(actual ** 2)))
+        model_rmse = float(np.sqrt(np.mean((actual - predicted[:, median]) ** 2)))
+        cov = float(np.mean((actual >= predicted[:, 0]) & (actual <= predicted[:, -1])))
+        out[key] = {
+            "label": label, "trading_days": days, "rmse_ret": model_rmse,
+            "skill_score": skill_score(model_rmse, naive_rmse), "coverage": cov,
+            "nominal_cov": qs[-1] - qs[0],
+            "width": float(np.mean(predicted[:, -1] - predicted[:, 0])),
+            "aggregation": "root_sum_square",
+        }
+    return out
 
 
 # ---------------------------------------------------------------- yardimci
