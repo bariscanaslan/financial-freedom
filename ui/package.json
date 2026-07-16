@@ -6,7 +6,8 @@
     "dev": "next dev -p 3007",
     "build": "next build",
     "start": "next start -p 3007",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile.junit=/tmp/test-results/frontend-junit.xml --coverage"
   },
   "dependencies": {
     "next": "^15.1.6",
@@ -21,6 +22,7 @@
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^3.0.2",
     "jsdom": "^25.0.1",
     "typescript": "^5.7.3",
     "vitest": "^3.0.2"

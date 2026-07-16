@@ -1,0 +1,7 @@
+# Jenkins bu dosyayi compose.yaml uzerine bind eder. Image'lar test edilmis
+# commit SHA ile gelir; --build kullanilmadigi icin canlida kaynak derlenmez.
+services:
+  api:
+    image: ${API_IMAGE:?API_IMAGE must be set}
+  ui:
+    image: ${UI_IMAGE:?UI_IMAGE must be set}

@@ -1,0 +1,28 @@
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration", "tests/regression"]
+addopts = "--strict-markers --strict-config"
+markers = [
+  "unit: fast, isolated tests",
+  "integration: tests spanning multiple application layers",
+  "regression: network-free financial/model invariant tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["api", "data", "model", "portfolio"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Baslangic tabani. Yeni testlerle kademeli olarak yukseltilmelidir.
+fail_under = 5
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+exclude = ["Main.ipynb"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

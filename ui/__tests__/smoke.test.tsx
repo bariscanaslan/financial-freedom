@@ -35,6 +35,9 @@ const h = vi.hoisted(() => {
     getForecast: vi.fn(),
     getTrades: vi.fn(),
     appendEvent: vi.fn(),
+    getPortfolioAlert: vi.fn(),
+    savePortfolioAlert: vi.fn(),
+    testPortfolioAlert: vi.fn(),
   };
 });
 
@@ -141,6 +144,9 @@ beforeEach(() => {
   h.getReport.mockResolvedValue(report);
   h.getForecast.mockResolvedValue(pforecast);
   h.getTrades.mockResolvedValue({ portfolio_id: "act_1", trades: [] });
+  h.getPortfolioAlert.mockResolvedValue(null);
+  h.savePortfolioAlert.mockResolvedValue({});
+  h.testPortfolioAlert.mockResolvedValue({ status: "sent", channels: [], errors: [] });
   h.getModels.mockResolvedValue(models);
   h.getTrainingCatalog.mockResolvedValue({ as_of: "2026-01-01", count: 1, tickers: [{ ticker: "AAPL", name: "Apple", has_model: true, last_trained_at: "2026-01-01T12:00:00" }] });
   h.getMarketOverview.mockResolvedValue(market);

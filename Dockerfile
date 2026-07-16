@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS application
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -23,5 +23,23 @@ COPY api ./api
 COPY data ./data
 COPY model ./model
 COPY portfolio ./portfolio
+
+FROM application AS test
+
+COPY requirements-dev.txt ./
+RUN pip install -r requirements-dev.txt
+COPY pyproject.toml ./
+COPY tests ./tests
+RUN mkdir -p /tmp/test-results \
+    && python -m pytest tests/unit tests/integration tests/regression \
+    --junitxml=/tmp/test-results/backend-junit.xml \
+    --cov=api --cov=data --cov=model --cov=portfolio \
+    --cov-report=xml:/tmp/test-results/backend-coverage.xml \
+    --cov-report=term-missing
+
+FROM scratch AS test-results
+COPY --from=test /tmp/test-results /
+
+FROM application AS runtime
 
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8089", "--workers", "1"]

@@ -13,7 +13,7 @@ cache
 models
 portfolio_data
 ui
-tests
+test-results
 .pytest_cache
 .mypy_cache
 .ruff_cache
