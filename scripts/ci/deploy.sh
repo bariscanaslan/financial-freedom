@@ -45,9 +45,11 @@ for directory in cache models portfolio_data nginx; do
   mkdir -p "${DEPLOY_DIR}/${directory}"
 done
 
-install -m 0644 "${ROOT}/compose.yaml" "${DEPLOY_DIR}/compose.yaml"
-install -m 0644 "${ROOT}/compose.deploy.yaml" "${DEPLOY_DIR}/compose.deploy.yaml"
-install -m 0644 "${ROOT}/nginx/default.conf" "${DEPLOY_DIR}/nginx/default.conf"
+if [ "${ROOT}" != "${DEPLOY_DIR}" ]; then
+  install -m 0644 "${ROOT}/compose.yaml" "${DEPLOY_DIR}/compose.yaml"
+  install -m 0644 "${ROOT}/compose.deploy.yaml" "${DEPLOY_DIR}/compose.deploy.yaml"
+  install -m 0644 "${ROOT}/nginx/default.conf" "${DEPLOY_DIR}/nginx/default.conf"
+fi
 install -m 0600 "${NORMALIZED_ENV}" "${DEPLOY_DIR}/.env"
 rm -f "${NORMALIZED_ENV}"
 trap - EXIT
