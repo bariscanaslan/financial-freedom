@@ -13,26 +13,34 @@ pipeline {
     DEPLOY_PROJECT_NAME = 'financial-freedom'
     // Jenkins container'inda ve Docker host'ta ayni mutlak yol mount edilmelidir.
     DEPLOY_DIR = '/AppData/financial-freedom'
-    API_IMAGE = "financial-freedom-api:${GIT_COMMIT}"
-    UI_IMAGE = "financial-freedom-ui:${GIT_COMMIT}"
     DOCKER_BUILDKIT = '1'
   }
 
   stages {
     stage('Checkout') {
       steps {
-        checkout scm
         script {
-          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-          env.API_IMAGE = "financial-freedom-api:${env.GIT_COMMIT}"
-          env.UI_IMAGE = "financial-freedom-ui:${env.GIT_COMMIT}"
+          def scmVars = checkout scm
+          env.COMMIT_SHA = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          env.SCM_BRANCH = scmVars.GIT_BRANCH ?: sh(
+            script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true
+          ).trim()
+          echo "SCM_BRANCH=${env.SCM_BRANCH} BRANCH_NAME=${env.BRANCH_NAME ?: ''} " +
+               "CHANGE_ID=${env.CHANGE_ID ?: ''} COMMIT_SHA=${env.COMMIT_SHA}"
         }
       }
     }
 
     stage('Tests and production builds') {
       steps {
-        sh 'chmod +x scripts/ci/*.sh && scripts/ci/test.sh'
+        script {
+          withEnv([
+            "API_IMAGE=financial-freedom-api:${env.COMMIT_SHA}",
+            "UI_IMAGE=financial-freedom-ui:${env.COMMIT_SHA}"
+          ]) {
+            sh 'chmod +x scripts/ci/*.sh && scripts/ci/test.sh'
+          }
+        }
       }
       post {
         always {
@@ -44,13 +52,20 @@ pipeline {
 
     stage('Deploy production') {
       when {
-        allOf {
-          branch 'main'
-          not { changeRequest() }
+        expression {
+          def branch = env.BRANCH_NAME ?: env.SCM_BRANCH ?: ''
+          return !env.CHANGE_ID && branch in ['main', 'origin/main', 'refs/heads/main']
         }
       }
       steps {
-        sh 'scripts/ci/deploy.sh'
+        script {
+          withEnv([
+            "API_IMAGE=financial-freedom-api:${env.COMMIT_SHA}",
+            "UI_IMAGE=financial-freedom-ui:${env.COMMIT_SHA}"
+          ]) {
+            sh 'scripts/ci/deploy.sh'
+          }
+        }
       }
     }
   }
