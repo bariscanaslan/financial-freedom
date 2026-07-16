@@ -55,18 +55,17 @@ pipeline {
         }
       }
       steps {
-        script {
-          withCredentials([file(
-            credentialsId: 'financial-freedom-production-env',
-            variable: 'DEPLOY_ENV_FILE'
-          )]) {
-            withEnv([
-              "API_IMAGE=financial-freedom-api:${env.COMMIT_SHA}",
-              "UI_IMAGE=financial-freedom-ui:${env.COMMIT_SHA}"
-            ]) {
-              sh 'scripts/ci/deploy.sh'
-            }
-          }
+        sshagent(['host-deploy-ssh']) {
+          sh '''
+            ssh -o StrictHostKeyChecking=no bariscanaslan@host.docker.internal '
+              set -e
+              cd /home/bariscanaslan/AppData/financial-freedom
+              git fetch --all
+              git reset --hard origin/main
+              chmod +x scripts/ci/*.sh
+              scripts/ci/deploy.sh
+            '
+          '''
         }
       }
     }

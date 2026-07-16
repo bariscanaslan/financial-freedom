@@ -11,6 +11,8 @@ Bu dosya projenin **ne olduğunu ve nasıl çalıştığını** anlatır. Kararl
 **neden** böyle alındığını ve **neyin denenip başarısız olduğunu**
 `development-guide.md` anlatır — yeni bir model yazmadan önce orası okunmalı.
 
+Jenkins yapısı eklendi.
+
 ---
 
 ## Backend ve frontend'i çalıştırma
