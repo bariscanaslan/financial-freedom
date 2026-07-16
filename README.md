@@ -122,7 +122,7 @@ yapıya taşındı.
 
 Cihaz (CUDA / XPU / CPU) elle yazılmaz; `model/device.py` makinede ne varsa
 onu bulur. Seçim sırası: **cuda > xpu > mps > cpu**. Bu makinede hangi cihazın
-seçileceğini görmek için:
+seçileceğini görmek için: 
 
 ```bash
 .venv/bin/python -m model.device
