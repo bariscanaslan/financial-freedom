@@ -50,9 +50,13 @@ Farkli bir dizindeyse ya bu dizine tasiyin ya da `Jenkinsfile` icindeki
 `DEPLOY_DIR` degerini degistirip Jenkins container'ina ayni mutlak yolda mount
 edin.
 
-Canli `.env` repoya alinmaz ve deploy sirasinda degistirilmez:
+Canli `.env` repoya alinmaz. Jenkins'te `financial-freedom-production-env`
+kimlikli bir **Secret file** credential olarak saklanir. Pipeline gecici secret
+dosyasini okur ve deploy sirasinda canli dizine `0600` izniyle yazar:
 
 ```dotenv
+DEPLOY_DIR=/srv/financial-freedom
+DEPLOY_PROJECT_NAME=financial-freedom
 VPN_BIND_ADDRESS=10.8.0.1
 FRONTEND_PORT=3007
 BACKEND_PORT=8089

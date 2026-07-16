@@ -10,9 +10,6 @@ pipeline {
   }
 
   environment {
-    DEPLOY_PROJECT_NAME = 'financial-freedom'
-    // Jenkins container'inda ve Docker host'ta ayni mutlak yol mount edilmelidir.
-    DEPLOY_DIR = '/home/bariscanaslan/AppData/financial-freedom'
     DOCKER_BUILDKIT = '1'
   }
 
@@ -59,11 +56,16 @@ pipeline {
       }
       steps {
         script {
-          withEnv([
-            "API_IMAGE=financial-freedom-api:${env.COMMIT_SHA}",
-            "UI_IMAGE=financial-freedom-ui:${env.COMMIT_SHA}"
-          ]) {
-            sh 'scripts/ci/deploy.sh'
+          withCredentials([file(
+            credentialsId: 'financial-freedom-production-env',
+            variable: 'DEPLOY_ENV_FILE'
+          )]) {
+            withEnv([
+              "API_IMAGE=financial-freedom-api:${env.COMMIT_SHA}",
+              "UI_IMAGE=financial-freedom-ui:${env.COMMIT_SHA}"
+            ]) {
+              sh 'scripts/ci/deploy.sh'
+            }
           }
         }
       }

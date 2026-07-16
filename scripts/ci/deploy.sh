@@ -1,15 +1,28 @@
 #!/usr/bin/env sh
 set -eu
 
-: "${DEPLOY_DIR:?DEPLOY_DIR must point to the persistent host deployment directory}"
+: "${DEPLOY_ENV_FILE:?DEPLOY_ENV_FILE must be provided by Jenkins Secret file credentials}"
+
+if [ ! -f "${DEPLOY_ENV_FILE}" ]; then
+  echo "Jenkins production environment file does not exist: ${DEPLOY_ENV_FILE}" >&2
+  exit 2
+fi
+
+# Dosya POSIX KEY=VALUE formatindadir. set -a ile Compose'un kullanacagi
+# degerler de child process ortam degiskenlerine aktarilir.
+set -a
+. "${DEPLOY_ENV_FILE}"
+set +a
+
+: "${DEPLOY_DIR:?DEPLOY_DIR must be set in the Jenkins production environment file}"
 : "${DEPLOY_PROJECT_NAME:=financial-freedom}"
 : "${API_IMAGE:?API_IMAGE must be set}"
 : "${UI_IMAGE:?UI_IMAGE must be set}"
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 
-if [ ! -d "${DEPLOY_DIR}" ] || [ ! -f "${DEPLOY_DIR}/.env" ]; then
-  echo "DEPLOY_DIR must exist and contain the live .env file: ${DEPLOY_DIR}" >&2
+if [ ! -d "${DEPLOY_DIR}" ]; then
+  echo "DEPLOY_DIR must exist: ${DEPLOY_DIR}" >&2
   exit 2
 fi
 
@@ -22,6 +35,7 @@ done
 install -m 0644 "${ROOT}/compose.yaml" "${DEPLOY_DIR}/compose.yaml"
 install -m 0644 "${ROOT}/compose.deploy.yaml" "${DEPLOY_DIR}/compose.deploy.yaml"
 install -m 0644 "${ROOT}/nginx/default.conf" "${DEPLOY_DIR}/nginx/default.conf"
+install -m 0600 "${DEPLOY_ENV_FILE}" "${DEPLOY_DIR}/.env"
 
 compose() {
   docker compose \
