@@ -24,7 +24,7 @@ services:
     volumes:
       - ./cache:/app/cache
       - ./models:/app/models
-      - ./portfolio_data:/app/portfolio_data
+      - ./portfolio_data:/app/portfolio_data 
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8089}:8089"
     depends_on:
