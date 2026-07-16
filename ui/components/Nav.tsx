@@ -79,7 +79,8 @@ export function Nav() {
           <div><span>TR</span><strong>{clock("Europe/Istanbul")}</strong><small>İstanbul</small></div>
           <div><span>US</span><strong>{clock("America/New_York")}</strong><small>New York</small></div>
         </div>
-        <small className="market-close-note">US normal seans kapanışı: 16:00</small>
+        <small className="market-close-note">US normal seans açılış: 16:30 (TSİ)</small>
+        <small className="market-close-note">US normal seans kapanışı: 23:00 (TSİ)</small>
       </div>
       <ul id="main-navigation" className={`nav-menu${open ? " is-open" : ""}`}>
         {LINKS.map((l) => {
