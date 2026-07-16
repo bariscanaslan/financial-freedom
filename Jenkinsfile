@@ -56,16 +56,19 @@ pipeline {
       }
       steps {
         sshagent(['host-deploy-ssh']) {
-          sh '''
+          sh """
             ssh -o StrictHostKeyChecking=no bariscanaslan@host.docker.internal '
               set -e
               cd /home/bariscanaslan/AppData/financial-freedom
               git fetch --all
               git reset --hard origin/main
               chmod +x scripts/ci/*.sh
+              DEPLOY_ENV_FILE=/home/bariscanaslan/AppData/financial-freedom/financial-freedom-production.env \
+              API_IMAGE=financial-freedom-api:${env.COMMIT_SHA} \
+              UI_IMAGE=financial-freedom-ui:${env.COMMIT_SHA} \
               scripts/ci/deploy.sh
             '
-          '''
+          """
         }
       }
     }
