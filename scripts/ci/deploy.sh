@@ -8,10 +8,23 @@ if [ ! -f "${DEPLOY_ENV_FILE}" ]; then
   exit 2
 fi
 
-# Dosya POSIX KEY=VALUE formatindadir. set -a ile Compose'un kullanacagi
-# degerler de child process ortam degiskenlerine aktarilir.
+# Jenkins'e tarayicidan yuklenen dosya Windows CRLF veya UTF-8 BOM tasiyabilir.
+# Shell ile okumadan once Linux formatina normalize et ve yalnizca KEY=VALUE,
+# yorum ve bos satirlara izin ver. Boylece env dosyasi komut calistiramaz.
+NORMALIZED_ENV=$(mktemp)
+trap 'rm -f "${NORMALIZED_ENV}"' EXIT
+tr -d '\r' < "${DEPLOY_ENV_FILE}" > "${NORMALIZED_ENV}"
+sed -i '1s/^\xEF\xBB\xBF//' "${NORMALIZED_ENV}"
+
+if grep -nEv '^[[:space:]]*($|#)|^[A-Za-z_][A-Za-z0-9_]*=.*$' "${NORMALIZED_ENV}"; then
+  echo "Invalid production environment file; expected KEY=VALUE lines." >&2
+  exit 2
+fi
+
+# set -a ile Compose'un kullanacagi degerler child process ortam
+# degiskenlerine de aktarilir.
 set -a
-. "${DEPLOY_ENV_FILE}"
+. "${NORMALIZED_ENV}"
 set +a
 
 : "${DEPLOY_DIR:?DEPLOY_DIR must be set in the Jenkins production environment file}"
@@ -35,7 +48,9 @@ done
 install -m 0644 "${ROOT}/compose.yaml" "${DEPLOY_DIR}/compose.yaml"
 install -m 0644 "${ROOT}/compose.deploy.yaml" "${DEPLOY_DIR}/compose.deploy.yaml"
 install -m 0644 "${ROOT}/nginx/default.conf" "${DEPLOY_DIR}/nginx/default.conf"
-install -m 0600 "${DEPLOY_ENV_FILE}" "${DEPLOY_DIR}/.env"
+install -m 0600 "${NORMALIZED_ENV}" "${DEPLOY_DIR}/.env"
+rm -f "${NORMALIZED_ENV}"
+trap - EXIT
 
 compose() {
   docker compose \
