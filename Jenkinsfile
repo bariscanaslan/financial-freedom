@@ -12,7 +12,7 @@ pipeline {
   environment {
     DEPLOY_PROJECT_NAME = 'financial-freedom'
     // Jenkins container'inda ve Docker host'ta ayni mutlak yol mount edilmelidir.
-    DEPLOY_DIR = '/AppData/financial-freedom'
+    DEPLOY_DIR = '/home/bariscanaslan/AppData/financial-freedom'
     DOCKER_BUILDKIT = '1'
   }
 
