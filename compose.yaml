@@ -19,7 +19,7 @@ services:
       SPP_API_HOST: 0.0.0.0
       SPP_API_PORT: 8089
       SPP_API_REDIS_URL: redis://redis:6389/0
-      SPP_API_CORS_ORIGINS: '["http://localhost:${FRONTEND_PORT:-3007}"]'
+      SPP_API_CORS_ORIGINS: '["http://${VPN_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-3007}"]'
       SPP_API_NOTIFICATION_INTERVAL_SECONDS: 900
     volumes:
       - ./cache:/app/cache
@@ -66,4 +66,10 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
     restart: unless-stopped
